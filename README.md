@@ -204,3 +204,141 @@ sequenceDiagram
         API->>API: Continue processing
     end
 ```
+```mermaid
+sequenceDiagram
+    participant User
+    participant WebUI as Backoffice-Web-Latest
+    participant API as Backoffice-API<br/>(AI Chat Controller)
+    participant Auth as JWT Middleware
+    participant Intent as Intent Classification
+    participant Guardrails as Guardrails Service<br/>(Planned)
+    participant Location as Location Validation
+    participant Extract as Multi-Period Extraction
+    participant MCP as MCP Service
+    participant SalesAPI as Sales Summary API
+    participant DB as Database
+    participant AI as AI Service
+    participant Logger as Security Logger
+
+    Note over User: User logged in as<br/>Restaurant: "Burger King" (ID: 5678)
+    
+    User->>WebUI: Types: "Show me sales for Pizza Palace"
+    WebUI->>WebUI: Capture user input
+    
+    WebUI->>API: POST /api/v1/ai-chat/stream<br/>Headers: { Authorization: Bearer JWT }
+    
+    API->>Auth: Validate JWT Token
+    Auth->>Auth: Decode token<br/>Extract: userId=1288, restaurantId=5678
+    Auth-->>API: { userId: 1288, restaurantId: 5678, restaurantName: "Burger King" }
+    
+    API->>Intent: classifyIntent("Show me sales for Pizza Palace")
+    Intent->>Intent: Analyze query keywords
+    Intent->>Intent: Match: "sales" → SALES_SUMMARY
+    Intent-->>API: { intent: "SALES_SUMMARY", confidence: 0.9 }
+    
+    alt Intent is SALES_SUMMARY
+        
+        rect rgb(255, 230, 200)
+            Note over API,Guardrails: PLANNED: Guardrails Layer
+            API->>Guardrails: validateQuery(message, restaurantId: 5678, userId: 1288)
+            
+            Guardrails->>Guardrails: Check 1: Extract restaurant mentions<br/>Found: "Pizza Palace"
+            Guardrails->>DB: Query: SELECT id FROM restaurants<br/>WHERE name = "Pizza Palace"
+            DB-->>Guardrails: restaurantId: 1234
+            
+            Guardrails->>Guardrails: Compare: 1234 ≠ 5678<br/>❌ VIOLATION DETECTED
+            
+            Guardrails->>Logger: Log security event<br/>{ userId: 1288, attemptedRestaurant: "Pizza Palace" }
+            Logger-->>Guardrails: Event logged
+            
+            Guardrails-->>API: { allowed: false,<br/>violation: "UNAUTHORIZED_RESTAURANT",<br/>reason: "Query mentions different restaurant" }
+        end
+        
+        alt Guardrails Failed
+            API->>API: Reject request
+            Note over API: Security violation detected
+            
+            API->>AI: streamChatCompletion({<br/>error: "UNAUTHORIZED_RESTAURANT",<br/>userRestaurant: "Burger King",<br/>attemptedRestaurant: "Pizza Palace"<br/>})
+            
+            AI->>AI: Generate error response
+            AI-->>API: Stream chunk: "You"
+            API-->>WebUI: Stream: "You"
+            WebUI-->>User: Display: "You"
+            
+            AI-->>API: Stream chunk: " can"
+            API-->>WebUI: Stream: " can"
+            WebUI-->>User: Display: " can"
+            
+            AI-->>API: Stream chunk: " only"
+            API-->>WebUI: Stream: " only"
+            WebUI-->>User: Display: " only"
+            
+            AI-->>API: Stream chunk: " access"
+            API-->>WebUI: Stream: " access"
+            WebUI-->>User: Display: " access"
+            
+            AI-->>API: Stream chunk: " sales"
+            API-->>WebUI: Stream: " sales"
+            WebUI-->>User: Display: " sales"
+            
+            AI-->>API: Stream chunk: " data"
+            API-->>WebUI: Stream: " data"
+            WebUI-->>User: Display: " data"
+            
+            AI-->>API: Stream chunk: " for"
+            API-->>WebUI: Stream: " for"
+            WebUI-->>User: Display: " for"
+            
+            AI-->>API: Stream chunk: " your"
+            API-->>WebUI: Stream: " your"
+            WebUI-->>User: Display: " your"
+            
+            AI-->>API: Stream chunk: " own"
+            API-->>WebUI: Stream: " own"
+            WebUI-->>User: Display: " own"
+            
+            AI-->>API: Stream chunk: " restaurant"
+            API-->>WebUI: Stream: " restaurant"
+            WebUI-->>User: Display: " restaurant"
+            
+            AI-->>API: Stream chunk: " (Burger King)"
+            API-->>WebUI: Stream: " (Burger King)"
+            WebUI-->>User: Display: " (Burger King)"
+            
+            AI-->>API: Stream complete
+            API-->>WebUI: Response complete (Status: 403)
+            
+            Note over User,WebUI: User sees:<br/>"You can only access sales data<br/>for your own restaurant (Burger King)"
+            
+        else Guardrails Passed (Alternative Happy Path)
+            Note over API: This path would execute<br/>if query was valid
+            
+            API->>Location: validateLocation(message, restaurantId: 5678)
+            Location-->>API: { isValid: true }
+            
+            API->>Extract: extractPeriods(message)
+            Extract-->>API: { periods: [...] }
+            
+            API->>MCP: POST /mcp (get_sales_summary)
+            MCP->>SalesAPI: GET /api/v1/reports/sales-summary
+            SalesAPI->>DB: Query orders_reports<br/>WHERE restaurantId = 5678
+            DB-->>SalesAPI: Sales data
+            SalesAPI-->>MCP: { results: [...] }
+            MCP-->>API: Formatted response
+            
+            API->>AI: streamChatCompletion(salesData)
+            AI-->>API: Stream sales response
+            API-->>WebUI: Stream response
+            WebUI-->>User: Display sales data
+        end
+        
+    else Intent is NOT SALES_SUMMARY
+        API->>API: Reject - Unsupported intent
+        API->>AI: Generate error response
+        AI-->>API: "I can only help with sales queries"
+        API-->>WebUI: Stream error
+        WebUI-->>User: Display error
+    end
+    
+    Note over Logger: Security Event Logged:<br/>Timestamp: 2023-12-18T10:30:00Z<br/>Severity: HIGH<br/>Action: BLOCKED
+```
