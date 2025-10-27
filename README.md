@@ -160,3 +160,47 @@ sequenceDiagram
         WebUI-->>User: Display: "I can only help with sales-related queries..."
     end
 ```
+
+```
+sequenceDiagram
+    participant API as Backoffice-API
+    participant Location as Location Validation Service
+    participant AI as AI Service
+
+    API->>Location: validateLocation(message, restaurantId)
+    Location->>Location: Check if query mentions<br/>other restaurant
+    
+    alt Mentions Other Restaurant
+        Location-->>API: { isValid: false }
+        API->>AI: Generate error response
+        AI-->>API: "Access denied"
+    else No Other Restaurant Mentioned
+        Location-->>API: { isValid: true }
+        API->>API: Continue processing
+    end
+```
+```
+sequenceDiagram
+    participant API as Backoffice-API
+    participant Guardrails as Guardrails Service
+    participant DB as Database
+    participant AI as AI Service
+
+    API->>Guardrails: validateQuery(message, restaurantId, userId)
+    
+    Guardrails->>Guardrails: Check 1: Restaurant Name Validation
+    Guardrails->>Guardrails: Check 2: Restaurant ID Validation
+    Guardrails->>Guardrails: Check 3: Location/Address Validation
+    Guardrails->>DB: Verify user has access to restaurantId
+    DB-->>Guardrails: Access permissions
+    
+    alt Any Violation Detected
+        Guardrails->>Guardrails: Log security event
+        Guardrails-->>API: { allowed: false, violation: "UNAUTHORIZED_RESTAURANT" }
+        API->>AI: Generate security error
+        AI-->>API: "Access denied"
+    else All Checks Pass
+        Guardrails-->>API: { allowed: true }
+        API->>API: Continue processing
+    end
+```
