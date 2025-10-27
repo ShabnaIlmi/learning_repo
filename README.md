@@ -132,3 +132,31 @@ sequenceDiagram
 - `name` - Restaurant name
 - `timezone` - Restaurant timezone offset
 - `paymentProvider` - Payment provider (ADYEN, etc.)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant WebUI as Backoffice-Web-Latest
+    participant API as Backoffice-API
+    participant Intent as Intent Classification Service
+    participant AI as AI Service
+
+    User->>WebUI: "What is the longest river in the world?"
+    WebUI->>API: POST /api/v1/ai-chat/stream
+    Note over API: Extract JWT token<br/>Get restaurantId
+    
+    API->>Intent: classifyIntent(message)
+    Intent->>Intent: Analyze: "What is the longest river..."
+    Intent->>Intent: No match for SALES_SUMMARY
+    Intent-->>API: { intent: "UNKNOWN", confidence: 0.1 }
+    
+    alt Intent is NOT SALES_SUMMARY
+        API->>API: Reject query
+        Note over API: Generate error response
+        
+        API->>AI: streamChatCompletion(errorContext)
+        AI-->>API: Stream: "I can only help with sales-related queries"
+        API-->>WebUI: Stream error message
+        WebUI-->>User: Display: "I can only help with sales-related queries..."
+    end
+```
