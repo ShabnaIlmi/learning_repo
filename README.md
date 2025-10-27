@@ -342,3 +342,192 @@ sequenceDiagram
     
     Note over Logger: Security Event Logged:<br/>Timestamp: 2023-12-18T10:30:00Z<br/>Severity: HIGH<br/>Action: BLOCKED
 ```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant WebUI as Backoffice-Web-Latest
+    participant API as Backoffice-API<br/>(AI Chat Controller)
+    participant ChatHistory as Chat History Service
+    participant Intent as Intent Classification
+    participant Context as Context Resolution
+    participant Extract as Multi-Period Extraction
+    participant MCP as MCP Service
+    participant SalesAPI as Sales Summary API
+    participant DB as Database
+    participant AI as AI Service
+
+    Note over User,WebUI: INITIAL QUERY
+    User->>WebUI: "Sales summary for December 18, 2023"
+    WebUI->>API: POST /api/v1/ai-chat/stream<br/>{ message: "Sales summary for December 18, 2023",<br/>conversationId: null }
+    
+    API->>API: Generate conversationId: "conv-123"
+    API->>Intent: classifyIntent(message)
+    Intent-->>API: { intent: "SALES_SUMMARY", confidence: 1.0 }
+    
+    API->>Extract: extractPeriods("Sales summary for December 18, 2023")
+    Extract-->>API: { periods: [{ dateFrom: "2023-12-18", dateTo: "2023-12-18" }] }
+    
+    API->>MCP: Execute get_sales_summary tool
+    MCP->>SalesAPI: GET /reports/sales-summary?date_from=2023-12-18
+    SalesAPI->>DB: Query orders_reports
+    DB-->>SalesAPI: { grossSales: 42185600, discounts: 0, ... }
+    SalesAPI-->>MCP: Sales data
+    MCP-->>API: Formatted response
+    
+    API->>AI: streamChatCompletion(salesData)
+    AI-->>API: "For December 18, 2023, total sales were $42,185,600..."
+    API-->>WebUI: Stream response
+    
+    API->>ChatHistory: saveMessage({<br/>conversationId: "conv-123",<br/>role: "user",<br/>message: "Sales summary for December 18, 2023",<br/>context: { dateFrom: "2023-12-18", dateTo: "2023-12-18" }<br/>})
+    
+    API->>ChatHistory: saveMessage({<br/>conversationId: "conv-123",<br/>role: "assistant",<br/>message: "For December 18, 2023, total sales were $42,185,600...",<br/>data: { grossSales: 42185600, ... }<br/>})
+    
+    WebUI-->>User: Display: "For December 18, 2023, total sales were $42,185,600..."
+    
+    Note over User,WebUI: FOLLOW-UP QUESTION
+    User->>WebUI: "What about discounts?"
+    WebUI->>API: POST /api/v1/ai-chat/stream<br/>{ message: "What about discounts?",<br/>conversationId: "conv-123" }
+    
+    API->>ChatHistory: getConversationHistory("conv-123")
+    ChatHistory-->>API: [<br/>{ role: "user", message: "Sales summary for December 18, 2023",<br/>  context: { dateFrom: "2023-12-18" } },<br/>{ role: "assistant", message: "...", data: { discounts: 0 } }<br/>]
+    
+    API->>Intent: classifyIntent("What about discounts?", conversationHistory)
+    Intent->>Intent: Analyze with context:<br/>Previous query was about sales<br/>Current query: "discounts"
+    Intent-->>API: { intent: "SALES_SUMMARY_FOLLOWUP", confidence: 0.95 }
+    
+    API->>Context: resolveContext("What about discounts?", conversationHistory)
+    Context->>Context: Extract from previous context:<br/>- dateFrom: "2023-12-18"<br/>- dateTo: "2023-12-18"<br/>- Focus: "discounts"
+    Context-->>API: {<br/>dateFrom: "2023-12-18",<br/>dateTo: "2023-12-18",<br/>metric: "discounts",<br/>previousData: { discounts: 0 }<br/>}
+    
+    alt Has Previous Data in Cache
+        API->>API: Use cached data from previous response
+        Note over API: No need to query database again
+        
+        API->>AI: streamChatCompletion({<br/>query: "What about discounts?",<br/>context: { discounts: 0, date: "2023-12-18" },<br/>conversationHistory<br/>})
+        
+        AI->>AI: Generate contextual response
+        AI-->>API: Stream: "For"
+        API-->>WebUI: Stream: "For"
+        WebUI-->>User: Display: "For"
+        
+        AI-->>API: Stream: " December"
+        API-->>WebUI: Stream: " December"
+        WebUI-->>User: Display: " December"
+        
+        AI-->>API: Stream: " 18"
+        API-->>WebUI: Stream: " 18"
+        WebUI-->>User: Display: " 18"
+        
+        AI-->>API: Stream: ","
+        API-->>WebUI: Stream: ","
+        WebUI-->>User: Display: ","
+        
+        AI-->>API: Stream: " there"
+        API-->>WebUI: Stream: " there"
+        WebUI-->>User: Display: " there"
+        
+        AI-->>API: Stream: " were"
+        API-->>WebUI: Stream: " were"
+        WebUI-->>User: Display: " were"
+        
+        AI-->>API: Stream: " no"
+        API-->>WebUI: Stream: " no"
+        WebUI-->>User: Display: " no"
+        
+        AI-->>API: Stream: " discounts"
+        API-->>WebUI: Stream: " discounts"
+        WebUI-->>User: Display: " discounts"
+        
+        AI-->>API: Stream: " applied"
+        API-->>WebUI: Stream: " applied"
+        WebUI-->>User: Display: " applied"
+        
+        AI-->>API: Stream complete
+        API-->>WebUI: Response complete
+        
+    else No Cached Data (Alternative Path)
+        Note over API: If data not in cache,<br/>re-query database
+        
+        API->>MCP: Execute get_sales_summary tool
+        MCP->>SalesAPI: GET /reports/sales-summary?date_from=2023-12-18
+        SalesAPI->>DB: Query orders_reports
+        DB-->>SalesAPI: Sales data
+        SalesAPI-->>MCP: { discounts: 0 }
+        MCP-->>API: Formatted response
+        
+        API->>AI: streamChatCompletion(salesData)
+        AI-->>API: Stream response
+        API-->>WebUI: Stream response
+        WebUI-->>User: Display response
+    end
+    
+    API->>ChatHistory: saveMessage({<br/>conversationId: "conv-123",<br/>role: "user",<br/>message: "What about discounts?",<br/>context: { dateFrom: "2023-12-18", metric: "discounts" }<br/>})
+    
+    API->>ChatHistory: saveMessage({<br/>conversationId: "conv-123",<br/>role: "assistant",<br/>message: "For December 18, there were no discounts applied"<br/>})
+    
+    Note over User,WebUI: SECOND FOLLOW-UP
+    User->>WebUI: "And refunds?"
+    WebUI->>API: POST /api/v1/ai-chat/stream<br/>{ message: "And refunds?",<br/>conversationId: "conv-123" }
+    
+    API->>ChatHistory: getConversationHistory("conv-123")
+    ChatHistory-->>API: [Previous messages + context]
+    
+    API->>Context: resolveContext("And refunds?", conversationHistory)
+    Context-->>API: {<br/>dateFrom: "2023-12-18",<br/>metric: "refunds",<br/>previousData: { refunds: 0 }<br/>}
+    
+    API->>AI: streamChatCompletion(cachedData + context)
+    AI-->>API: "There were no refunds on December 18, 2023"
+    API-->>WebUI: Stream response
+    WebUI-->>User: Display: "There were no refunds on December 18, 2023"
+
+    
+    API->>ChatHistory: saveMessage(user + assistant messages)
+```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant WebUI as Backoffice-Web
+    participant API as Backoffice-API
+    participant History as Chat History
+    participant AI as AI Service
+
+    Note over User,WebUI: INITIAL QUERY
+    User->>WebUI: "Sales for December 18, 2023"
+    WebUI->>API: POST /ai-chat/stream<br/>conversationId: null
+    API->>API: Process query → Get sales data
+    API->>AI: Generate response with sales data
+    AI-->>API: "Total sales: $42,185,600, discounts: $0, refunds: $0"
+    API->>History: Save conversation<br/>conversationId: "conv-123"<br/>context: { date: "2023-12-18", data: {...} }
+    API-->>WebUI: Stream response
+    WebUI-->>User: Display: "Total sales: $42,185,600..."
+
+    Note over User,WebUI: FOLLOW-UP QUESTION
+    User->>WebUI: "What about discounts?"
+    WebUI->>API: POST /ai-chat/stream<br/>conversationId: "conv-123"
+    
+    API->>History: Get conversation history("conv-123")
+    History-->>API: Previous messages + context<br/>{ date: "2023-12-18", data: { discounts: 0 } }
+    
+    API->>AI: Generate response with:<br/>- Current query: "What about discounts?"<br/>- Previous context: date + cached data
+    AI-->>API: "For December 18, there were no discounts ($0)"
+    
+    API->>History: Save follow-up message
+    API-->>WebUI: Stream response
+    WebUI-->>User: Display: "For December 18, there were no discounts"
+
+    Note over User,WebUI: SECOND FOLLOW-UP
+    User->>WebUI: "And refunds?"
+    WebUI->>API: POST /ai-chat/stream<br/>conversationId: "conv-123"
+    
+    API->>History: Get conversation history("conv-123")
+    History-->>API: All previous messages + context
+    
+    API->>AI: Generate response with context
+    AI-->>API: "There were no refunds ($0) on December 18"
+    
+    API->>History: Save message
+    API-->>WebUI: Stream response
+    WebUI-->>User: Display: "There were no refunds on December 18"
+```
