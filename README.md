@@ -161,7 +161,7 @@ sequenceDiagram
     end
 ```
 
-```
+```mermaid
 sequenceDiagram
     participant API as Backoffice-API
     participant Location as Location Validation Service
@@ -179,7 +179,7 @@ sequenceDiagram
         API->>API: Continue processing
     end
 ```
-```
+```mermaid
 sequenceDiagram
     participant API as Backoffice-API
     participant Guardrails as Guardrails Service
