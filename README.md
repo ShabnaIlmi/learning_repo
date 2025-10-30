@@ -531,3 +531,68 @@ sequenceDiagram
     API-->>WebUI: Stream response
     WebUI-->>User: Display: "There were no refunds on December 18"
 ```
+```mermaid
+flowchart LR
+    %% ===========================
+    %% STYLES
+    %% ===========================
+    classDef user fill:#fef3c7,stroke:#b45309,stroke-width:1px,color:#000;
+    classDef web fill:#bfdbfe,stroke:#1d4ed8,stroke-width:1px,color:#000;
+    classDef api fill:#a7f3d0,stroke:#047857,stroke-width:1px,color:#000;
+    classDef service fill:#fbcfe8,stroke:#9d174d,stroke-width:1px,color:#000;
+    classDef db fill:#fde68a,stroke:#b45309,stroke-width:1px,color:#000;
+    classDef infra fill:#e5e7eb,stroke:#374151,stroke-width:1px,color:#000;
+
+    %% ===========================
+    %% USER
+    %% ===========================
+    User["👤 User (Employee)"]:::user
+
+    %% ===========================
+    %% BACKOFFICE-WEB
+    %% ===========================
+    subgraph WEB["Backoffice-Web"]
+        Frontend["chatbot-frontend<br/><br/>• User Interface<br/>• Deployed via Vercel AI SDK<br/>• Loaded dynamically as micro-frontend"]:::web
+    end
+
+    %% ===========================
+    %% BACKOFFICE-API
+    %% ===========================
+    subgraph API["Backoffice-API"]
+        Backend["chatbot-backend<br/><br/>• Intent Classification<br/>• Conversation Memory Store<br/>• Calls MCP Server"]:::api
+        Guardrails["guardrails-layer<br/><br/>• Input Validation"]:::api
+        Cache["cache-layer<br/><br/>• Stores recent query results and FAQ lookups"]:::api
+    end
+
+    %% ===========================
+    %% MCP-SERVICE LAYER
+    %% ===========================
+    subgraph MCP["mcp-service"]
+        MCPService["• Response Generation<br/>• Gateway to Redshift, OpenSearch & Microservices<br/>• Manages API Keys/Auth<br/>• Orchestrates Chatbot Workflow<br/>• Returns Raw Data"]:::service
+    end
+
+    %% ===========================
+    %% DATA / SUPPORT LAYERS
+    %% ===========================
+    subgraph DATA["Data & Support Services"]
+        Redshift["redshift<br/><br/>• Data warehouse for report-based and real-time queries"]:::db
+        OpenSearch["open-search<br/><br/>• Document-based search for FAQs"]:::db
+        S3["s3 bucket<br/><br/>• Stores relevant documents for FAQs"]:::db
+        Observability["observability-layer<br/><br/>• Tracing, Metrics, Logging"]:::infra
+        OtherMicro["other microservices<br/><br/>• Calculation API & Backoffice APIs for actions"]:::infra
+    end
+
+    %% ===========================
+    %% CONNECTIONS
+    %% ===========================
+    User -->|authentication| Frontend
+    Frontend -->|JWT Token| Backend
+    Backend --> Guardrails
+    Guardrails --> Cache
+    Backend -->|API Key| MCPService
+    MCPService --> Observability
+    MCPService -->|Query Data| Redshift
+    MCPService -->|Search Requests| OpenSearch
+    OpenSearch -->|Document Source| S3
+    MCPService -->|Workflow/Action| OtherMicro
+```
