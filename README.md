@@ -596,3 +596,72 @@ flowchart LR
     OpenSearch -->|Document Source| S3
     MCPService -->|Workflow/Action| OtherMicro
 ```
+
+```mermaid
+flowchart LR
+    %% ===========================
+    %% STYLES
+    %% ===========================
+    classDef user fill:#fff2cc,stroke:#d6b656,stroke-width:1px,color:#000;
+    classDef web fill:#dae8fc,stroke:#6c8ebf,stroke-width:1px,color:#000;
+    classDef api fill:#d5e8d4,stroke:#82b366,stroke-width:1px,color:#000;
+    classDef service fill:#f8cecc,stroke:#b85450,stroke-width:1px,color:#000;
+    classDef data fill:#ffe6cc,stroke:#d79b00,stroke-width:1px,color:#000;
+    classDef observ fill:#e1d5e7,stroke:#9673a6,stroke-width:1px,color:#000;
+
+    %% ===========================
+    %% USER
+    %% ===========================
+    User["👤 User (Employee)"]:::user
+
+    %% ===========================
+    %% BACKOFFICE WEB LAYER
+    %% ===========================
+    subgraph Web["Backoffice-Web"]
+        Frontend["chatbot-frontend<br/><br/>• User Interface<br/>• Deployed using Vercel AI SDK<br/>• Loaded dynamically as micro-frontend import"]:::web
+    end
+
+    %% ===========================
+    %% BACKOFFICE API LAYER
+    %% ===========================
+    subgraph API["Backoffice-API"]
+        Backend["chatbot-backend<br/><br/>• Intent Classification<br/>• Conversation Memory Store<br/>• Calls MCP Server when data is needed"]:::api
+        Guardrails["guardrails-layer<br/><br/>• Input Validation"]:::api
+        Cache["cache-layer<br/><br/>• Stores recent query results & FAQ lookups"]:::api
+    end
+
+    %% ===========================
+    %% MCP SERVICE LAYER
+    %% ===========================
+    subgraph MCP["mcp-service"]
+        MCPService["• Response Generation<br/>• Gateway to Redshift, OpenSearch, and other microservices<br/>• Manages API Keys & Auth<br/>• Orchestrates chatbot workflow<br/>• Returns raw data"]:::service
+    end
+
+    %% ===========================
+    %% DATA AND OBSERVABILITY LAYERS
+    %% ===========================
+    subgraph Data["Data & Supporting Services"]
+        Redshift["Redshift<br/><br/>• Data warehouse for reports & real-time queries"]:::data
+        OpenSearch["OpenSearch<br/><br/>• Document-based search for FAQs"]:::data
+        S3["S3 Bucket<br/><br/>• Stores relevant documents for FAQs"]:::data
+        OtherMicro["Other Microservices<br/><br/>• Calculation API & BackOffice APIs for single/workflow actions"]:::data
+    end
+
+    subgraph Observability["Observability Layer"]
+        Monitor["• Tracing<br/>• Metrics<br/>• Logging"]:::observ
+    end
+
+    %% ===========================
+    %% CONNECTIONS
+    %% ===========================
+    User -->|Authentication| Frontend
+    Frontend -->|JWT Token| Backend
+    Backend --> Guardrails
+    Guardrails --> Cache
+    Backend -->|API Key| MCPService
+    MCPService --> Monitor
+    MCPService -->|Query Data| Redshift
+    MCPService -->|Search Requests| OpenSearch
+    OpenSearch -->|Document Source| S3
+    MCPService -->|Workflow Actions| OtherMicro
+```
