@@ -776,3 +776,78 @@ flowchart TD
     StreamResponse --> DisplayResult
     DisplayResult --> End
 ````mermaid
+
+# AI Bot Infrastructure Diagram
+
+```mermaid
+graph LR
+    User[👤 User]
+    Web[🌐 Backoffice Web<br/>React + Next.js<br/>Port: 3000]
+    API[⚙️ Backoffice API<br/>Node.js + Express<br/>Port: 8100]
+    MCP[🔧 MCP Service<br/>JSON-RPC Server<br/>Port: 8000]
+    Groq[🤖 Groq API<br/>Llama 3.3-70b]
+    DB[(💾 MySQL Database<br/>orders_reports)]
+    
+    User -->|Chat Query| Web
+    Web -->|POST /api/chat| API
+    API -->|Intent & Dates| Groq
+    API -->|JSON-RPC| MCP
+    MCP -->|Sales API| API
+    API -->|SQL Query| DB
+    DB -->|Sales Data| API
+    API -->|Stream Response| Groq
+    Groq -->|AI Response| API
+    API -->|Stream| Web
+    Web -->|Display| User
+    
+    style User fill:#e1f5ff
+    style Web fill:#d4edff
+    style API fill:#f0e1ff
+    style MCP fill:#e1ffe1
+    style Groq fill:#fff4e1
+    style DB fill:#ffe1e1
+```
+
+## System Components
+
+### **1. Backoffice Web (Frontend)**
+- React application with chat interface
+- Handles user input and streaming display
+- Port: 3000
+
+### **2. Backoffice API (Backend)**
+- Main orchestration service
+- Intent classification & date extraction
+- Sales data fetching & AI response generation
+- Port: 8100
+
+### **3. MCP Service**
+- JSON-RPC 2.0 protocol server
+- Tool execution middleware
+- Port: 8000
+
+### **4. Groq API**
+- AI model: llama-3.3-70b-versatile
+- Intent classification, date extraction, response generation
+
+### **5. MySQL Database**
+- Stores sales data in orders_reports table
+- Port: 3306
+
+## Data Flow
+
+```
+User → Web → API → Groq (Intent/Dates)
+              ↓
+            MCP → API → Database
+              ↓
+           Groq (Response) → API → Web → User
+```
+
+## Ports
+
+- Backoffice Web: **3000**
+- Backoffice API: **8100**
+- MCP Service: **8000**
+- MySQL: **3306**
+
