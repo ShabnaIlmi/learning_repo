@@ -715,4 +715,64 @@ flowchart TD
     class A1,A5,A8,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19,A20,A21 process;
     class A3,A6,A7 decision;
     class A2,A4,A22 action;
-```
+````
+
+```mermaid
+flowchart TD
+
+    %% --- NODES ---
+    Start["Start"]
+    Login["User logs into the backoffice system and accesses the AI Assistant"]
+    Prompt["User enters the prompt (backoffice-web-latest)"]
+    AccessCheck["Is the user authorized to access the service? (Role-based access control)"]
+    Unauthorized["Display the error message"]
+    AIChat["AI Chat Controller (backoffice-api)"]
+    IntentCheck["If intent = 'Sales Summary'"]
+    MultiPeriod["Is Multi-Period?"]
+    ErrorMsg["Display error message"]
+    MultiPeriodService["Multi-Period Extraction Service (backoffice-api)"]
+    ExecuteTool["MCP Tool Service executeSalesSummaryTool() (backoffice-api)"]
+    ToolHandler["Sales Summary Tool Handler (get_sales_summary) (mcp-service)"]
+    SalesSummaryCtrl["Sales Summary Controller /reports/sales-summary (backoffice-api)"]
+    JWT["JWT Token Validation (Extract restaurantId) (backoffice-api)"]
+    Timezone["Timezone Service (Convert dates to UTC) (backoffice-api)"]
+    ParallelQueries["Parallel Queries (backoffice-api)"]
+    TotalSales["Sales Summary Service (getTotalSales) (backoffice-api)"]
+    GroupPayments["Sales Summary Service (groupAndSumPaymentsById) (backoffice-api)"]
+    QueryDB["Querying the orders_reports table in the database"]
+    CombineResults["Combining the query results"]
+    AISummary["AI Service Generate natural language (backoffice-api)"]
+    StreamResponse["Streaming the response (backoffice-api)"]
+    DisplayResult["Display the streamed response to the user"]
+    End["End"]
+
+    %% --- CONNECTIONS ---
+    Start --> Login
+    Login --> Prompt
+    Prompt --> AccessCheck
+    AccessCheck -->|Authorized| AIChat
+    AccessCheck -->|Unauthorized| Unauthorized
+    Unauthorized --> Prompt
+
+    AIChat --> IntentCheck
+    IntentCheck -->|Sales Summary| MultiPeriod
+    IntentCheck -->|Other| ErrorMsg
+    MultiPeriod -->|Yes| MultiPeriodService
+    MultiPeriod -->|No| ExecuteTool
+    ErrorMsg --> Prompt
+
+    ExecuteTool --> ToolHandler
+    ToolHandler --> SalesSummaryCtrl
+    SalesSummaryCtrl --> JWT
+    JWT --> Timezone
+    Timezone --> ParallelQueries
+    ParallelQueries --> TotalSales
+    ParallelQueries --> GroupPayments
+    TotalSales --> QueryDB
+    GroupPayments --> QueryDB
+    QueryDB --> CombineResults
+    CombineResults --> AISummary
+    AISummary --> StreamResponse
+    StreamResponse --> DisplayResult
+    DisplayResult --> End
+````mermaid
