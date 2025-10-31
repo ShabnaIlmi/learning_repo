@@ -665,3 +665,54 @@ flowchart LR
     OpenSearch -->|Document Source| S3
     MCPService -->|Workflow Actions| OtherMicro
 ```
+```mermaid
+flowchart TD
+    %% Start
+    A0([Start]) --> A1[User logs into the backoffice system and accesses the AI Assistant]
+    A1 --> A2[User enters the prompt (backoffice-web-react)]
+    
+    %% Access validation
+    A2 --> A3{Is the user authorized to access (Role-based Access)?}
+    A3 -- No --> A4[Display the error message]
+    A4 --> A2
+    A3 -- Yes --> A5[AI Chat Controller (backoffice-api)]
+    
+    %% Summary type decision
+    A5 --> A6{Is it a Sales or Transaction Summary?}
+    A6 -- No --> A4
+    A6 -- Yes --> A7{Is Multi-Period?}
+    
+    %% Multi-period or single
+    A7 -- No --> A9[MCP Tool Service executeSummaryTool (backoffice-api)]
+    A7 -- Yes --> A8[Multi-Period Extraction Service (backoffice-api)]
+    A8 --> A9
+    
+    %% Summary flow
+    A9 --> A10[Sales Summary Tool Handler (get_sales_summary) (http-service)]
+    A10 --> A11[Sales Summary Controller (controllers/sales-summary) (backoffice-api)]
+    A11 --> A12[JWT Token Validation (Token middleware) (backoffice-api)]
+    A12 --> A13[Timezone Service (Convert dates to UTC) (backoffice-api)]
+    A13 --> A14[Parallel Queries (backoffice-api)]
+    A14 --> A15[Sales Summary Service (getSalesSummaryV4) (backoffice-api)]
+    A15 --> A16[Sales Summary Service (getTotalSalesV4) (backoffice-api)]
+    
+    %% Query and AI layer
+    A16 --> A17[Querying the orders, reports tables in the database]
+    A17 --> A18[Querying the orders, reports tables in the database]
+    A18 --> A19[Combining the query results]
+    A19 --> A20[AI Service Generate natural language (backoffice-api)]
+    A20 --> A21[Streaming the response (backoffice-api)]
+    A21 --> A22[Display the streamed response to the user]
+    A22 --> A23([End])
+    
+    %% Styling
+    classDef startend fill:#f9b233,stroke:#333,stroke-width:1px,color:#000;
+    classDef process fill:#b3d9ff,stroke:#0077b6,stroke-width:1px;
+    classDef decision fill:#dab6fc,stroke:#7b2cbf,stroke-width:1px;
+    classDef action fill:#a6f4a0,stroke:#2a9d8f,stroke-width:1px;
+    
+    class A0,A23 startend;
+    class A1,A5,A8,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19,A20,A21 process;
+    class A3,A6,A7 decision;
+    class A2,A4,A22 action;
+```
